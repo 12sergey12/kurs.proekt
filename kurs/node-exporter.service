@@ -1,1 +1,14 @@
-n
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+Restart=always
+User=prometheus
+Group=prometheus
+Type=simple
+#ExecStart=/etc/prometheus/node-exporter/node_exporter
+ExecStart=/usr/local/bin/node_exporter
+[Install]
+WantedBy=multi-user.target
+
