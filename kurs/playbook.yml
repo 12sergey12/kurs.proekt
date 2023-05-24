@@ -1,1 +1,135 @@
-p
+---
+
+- name: Prometheus Installing
+  hosts: prometheus-hosts
+  become: true
+  tasks:
+    - name: Create User Prometheus
+      user:
+        name: prometheus
+        create_home: no
+        shell: /bin/false
+    - name: Create Directories For Prometheus
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+      loop:
+        - '/tmp/prometheus'
+        - '/etc/prometheus'
+        - '/var/lib/prometheus'
+    - name: Download And Unzipped Prometheus
+      unarchive:
+        src: https://github.com/prometheus/prometheus/releases/download/v2.28.1/prometheus-2.>
+        dest: /tmp/prometheus
+        creates: /tmp/prometheus/prometheus-2.28.1.linux-amd64
+        remote_src: yes
+    - name: Copy Bin Files From Unzipped to Prometheus
+      copy:
+        src: /tmp/prometheus/prometheus-2.28.1.linux-amd64/{{ item }}
+        dest: /usr/local/bin/
+        remote_src: yes
+        mode: preserve
+        owner: prometheus
+        group: prometheus
+      loop: [ 'prometheus', 'promtool' ]
+    - name: Copy Conf Files From Unzipped to Prometheus
+      copy:
+        src: /tmp/prometheus/prometheus-2.28.1.linux-amd64/{{ item }}
+        dest: /etc/prometheus/
+        remote_src: yes
+        mode: preserve
+       owner: prometheus
+        group: prometheus
+      loop: [ 'console_libraries', 'consoles', 'prometheus.yml' ]
+    - name: Create File for Prometheus Systemd
+      template:
+        src: prometheus.service
+        dest: /etc/systemd/system/
+#      notify:
+#        - systemd reload
+#    - name: Systemctl Prometheus Start
+#     systemd:
+#        name: prometheus
+#        state: started
+#        enabled: yes
+    - name: config prometheus
+      template:
+        src: prometheus.j2
+        dest: /etc/prometheus/prometheus.yml
+    - name: Systemctl Prometheus Start
+      systemd:
+        name: prometheus
+        state: started
+        enabled: yes
+
+- name: Install Node-exporter
+  hosts: node-exporter-hosts
+  become: true
+  tasks:
+    - name: Create User Prometheus
+      user:
+        name: prometheus
+        create_home: no
+        shell: /bin/false
+    - name: Create Directories For Node-exporter
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: prometheus
+        group: prometheus
+      loop:
+        - '/tmp/node-exporter'
+        - '/etc/prometheus/node-exporter'
+    - name: Download And Unzipped Node-exporter
+      unarchive:
+        src: https://github.com/prometheus/node_exporter/releases/download/v1.0.0/node_export>
+        dest: /tmp/node-exporter
+        creates: /tmp/node-exporter/node_exporter-1.0.0.linux-amd64
+        remote_src: yes
+    - name: Copy Conf Files From Unzipped to Node-exporter
+      copy:
+        src: /tmp/node-exporter/node_exporter-1.0.0.linux-amd64/{{ item }}
+        dest: /etc/prometheus/node-exporter
+        remote_src: yes
+        mode: preserve
+        owner: prometheus
+        group: prometheus
+      loop: [ 'node_exporter', 'NOTICE', 'LICENSE' ]
+    - name: Create File for Node-exporter Systemd
+      template:
+        src: node-exporter.service
+        dest: /etc/systemd/system/
+    - name: Systemctl Node-exporter Start
+      systemd:
+        name: node-exporter
+        state: started
+        enabled: yes
+  
+ - name: WEB install Nginx Log Exporter
+  hosts: webservers
+  become: true
+  tasks:
+    - name: Install Nginx Log Exporter
+      ansible.builtin.apt:
+        deb: https://github.com/martin-helmich/prometheus-nginxlog-exporter/releases/download>
+        state: present
+    - name: Edit service prometheus-nginxlog-exporter
+      template:
+        src: prometheus-nginxlog-exporter.hcl.j2
+        dest: /etc/prometheus-nginxlog-exporter.hcl
+    - name: chmod nginx access log to 755
+      file:
+        path: /var/log/nginx/access.log
+        mode: 0755
+    - name: chmod nginx error log to 755./
+      file:
+        path: /var/log/nginx/error.log
+        mode: 0755
+    - name: Start service Nginx Log Exporter
+      ansible.builtin.service:
+        name: prometheus-nginxlog-exporter.service
+        state: restarted
+
+    
